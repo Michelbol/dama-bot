@@ -25,309 +25,314 @@ const cardinalPointsAvailableBlack = {
 	NORTHEAST: 'NorthEast',
 }
 
-let model = {
-	setup: true,
-	turn: "",
-	whiteLeft: 0,
-	blackLeft: 0,
-	typeWhite: playerType.HUMAN,
-	typeBlack: playerType.MACHINE,
-	board: {
-		rows: 0,
-		columns: 0,
-		pieces: 0,
-		selected: null,
-		positions: [],
-		addWhitePieces: function(piecesPerSide) {
-			model.whiteLeft = piecesPerSide;
-			let remaining = piecesPerSide;
-			let currentRow = 0;
-			let currentColumn = 1;
-			while(remaining > 0)
-			{
-				this.positions[currentRow][currentColumn] = new model.WhitePiece(currentRow, currentColumn);
-				if(currentColumn === this.columns-1){
-					currentColumn++;
-				}else if(currentColumn === this.columns-2){
-					currentColumn += 3;
-				}else{
+let model = getModel();
+
+function getModel(){
+	return {
+		setup: true,
+		turn: "",
+		whiteLeft: 0,
+		blackLeft: 0,
+		typeWhite: playerType.HUMAN,
+		typeBlack: playerType.MACHINE,
+		board: {
+			rows: 0,
+			columns: 0,
+			pieces: 0,
+			selected: null,
+			positions: [],
+			addWhitePieces: function(piecesPerSide) {
+				model.whiteLeft = piecesPerSide;
+				let remaining = piecesPerSide;
+				let currentRow = 0;
+				let currentColumn = 1;
+				while(remaining > 0)
+				{
+					this.positions[currentRow][currentColumn] = new model.WhitePiece(currentRow, currentColumn);
+					if(currentColumn === this.columns-1){
+						currentColumn++;
+					}else if(currentColumn === this.columns-2){
+						currentColumn += 3;
+					}else{
+						currentColumn += 2;
+					}
+					if(currentColumn >= this.columns){
+						currentRow++;
+					}
+					currentColumn = currentColumn % this.columns;
+					remaining--;
+				}
+			},
+			addBlackPieces: function(piecesPerSide) {
+				model.blackLeft = piecesPerSide;
+				let remaining = piecesPerSide;
+				let currentRow = this.rows-1;
+				let currentColumn = this.columns-2;
+				while(remaining > 0)
+				{
+					this.positions[currentRow][currentColumn] = new model.BlackPiece(currentRow, currentColumn);
+					currentColumn-=2;
+					if(currentColumn < 0){
+						currentRow--;
+					}
+					if(currentColumn === -1){
+						currentColumn = this.columns - 2;
+					} else if(currentColumn === -2){
+						currentColumn = this.columns - 1;
+					}
+					currentColumn = currentColumn % this.columns;
+					remaining--;
+				}
+			},
+			initBoard: function(rows, columns, piecesPerSide){
+				model.turn = turns.WHITE;
+
+				this.rows = rows;
+				this.columns = columns;
+				for(let i = 0; i < rows; i++) {
+					this.positions[i] = [];
+					for(let j = 0; j < columns; j++){
+						this.positions[i][j] = new model.Piece(i, j);
+					}
+				}
+				this.addWhitePieces(piecesPerSide);
+				this.addBlackPieces(piecesPerSide);
+			},
+			drawBoard: function() {
+				while (document.querySelector("main").firstChild){
+					document.querySelector("main").removeChild(document.querySelector("main").firstChild);
+				}
+
+				let board = document.querySelector("main").appendChild(document.createElement("div"));
+				board.className = "board";
+
+				let rows = this.rows;
+				let columns = this.columns;
+
+				let actualRow = 0;
+				let actualColumn = 0;
+				for (let i=0; i< rows*columns; i++) {
+					let isWhite = parseInt((i / columns) + i) % 2 === 0;
+					let cell = document.createElement("div");
+					cell.setAttribute("row", actualRow.toString());
+					cell.setAttribute("column", actualColumn.toString());
+					cell.className = isWhite ? 'cell cell-white' : 'cell cell-black';
+					board.appendChild(cell);
+					actualColumn++;
+					if (actualColumn >= columns) {
+						actualColumn = 0;
+						actualRow++;
+					}
+				}
+				for(let i = 0; i < rows; i++) {
+					for(let j = 0; j < columns; j++) {
+						let cell = document.querySelectorAll('div[row="'+i+'"][column="'+j+'"]')[0];
+						if(!this.positions[i][j].isEmpty()) {
+							let newPiece = document.createElement('img');
+							newPiece.setAttribute('src', this.positions[i][j].src);
+							cell.appendChild(newPiece);
+							if(this.positions[i][j].selected)
+								cell.className += ' selected';
+						}
+						if(this.positions[i][j].highlighted) {
+							cell.className += ' highlight';
+							let that = this;
+							cell.addEventListener('click', function() {
+								that.selected.changePosition(parseInt(this.getAttribute('row')), parseInt(this.getAttribute('column')));
+								that.unselectCell();
+								that.drawBoard();
+							});
+						} else {
+							let that = this;
+							cell.addEventListener('click', function(){
+								that.selectCell(this.getAttribute('row'), this.getAttribute('column'));
+								that.drawBoard();
+							});
+						}
+					}
+				}
+				if(model[`type${model.turn}`] === playerType.MACHINE){
+					movementPiece();
+				}
+			},
+			putInitialPieces: function (pieces) {
+				let remaining = pieces;
+				let currentRow = 0;
+				let currentColumn = 1;
+				while(remaining > 0)
+				{
+					this.positions[currentRow][currentColumn] = new model.WhitePiece(currentRow, currentColumn);
+					remaining--;
 					currentColumn += 2;
-				}
-				if(currentColumn >= this.columns){
-					currentRow++;
-				}
-				currentColumn = currentColumn % this.columns;
-				remaining--;
-			}
-		},
-		addBlackPieces: function(piecesPerSide) {
-			model.blackLeft = piecesPerSide;
-			let remaining = piecesPerSide;
-			let currentRow = this.rows-1;
-			let currentColumn = this.columns-2;
-			while(remaining > 0)
-			{
-				this.positions[currentRow][currentColumn] = new model.BlackPiece(currentRow, currentColumn);
-				currentColumn-=2;
-				if(currentColumn < 0){
-					currentRow--;
-				}
-				if(currentColumn === -1){
-					currentColumn = this.columns - 2;
-				} else if(currentColumn === -2){
-					currentColumn = this.columns - 1;
-				}
-				currentColumn = currentColumn % this.columns;
-				remaining--;
-			}
-		},
-		initBoard: function(rows, columns, piecesPerSide){
-			model.turn = turns.WHITE;
+					if(currentColumn > this.columns)
+						currentRow++;
+					currentColumn = currentColumn % this.columns;
 
-			this.rows = rows;
-			this.columns = columns;
-			for(let i = 0; i < rows; i++) {
-				this.positions[i] = [];
-				for(let j = 0; j < columns; j++){
-					this.positions[i][j] = new model.Piece(i, j);
 				}
-			}
-			this.addWhitePieces(piecesPerSide);
-			this.addBlackPieces(piecesPerSide);
-		},
-		drawBoard: function() {
-			while (document.querySelector("main").firstChild){
-				document.querySelector("main").removeChild(document.querySelector("main").firstChild);
-			}
-
-			let board = document.querySelector("main").appendChild(document.createElement("div"));
-			board.className = "board";
-
-			let rows = this.rows;
-			let columns = this.columns;
-
-			let actualRow = 0;
-			let actualColumn = 0;
-			for (let i=0; i< rows*columns; i++) {
-				let isWhite = parseInt((i / columns) + i) % 2 === 0;
-				let cell = document.createElement("div");
-				cell.setAttribute("row", actualRow.toString());
-				cell.setAttribute("column", actualColumn.toString());
-				cell.className = isWhite ? 'cell cell-white' : 'cell cell-black';
-				board.appendChild(cell);
-				actualColumn++;
-				if (actualColumn >= columns) {
-					actualColumn = 0;
-					actualRow++;
-				}
-			}
-			for(let i = 0; i < rows; i++) {
-				for(let j = 0; j < columns; j++) {
-					let cell = document.querySelectorAll('div[row="'+i+'"][column="'+j+'"]')[0];
-					if(!this.positions[i][j].isEmpty()) {
-						let newPiece = document.createElement('img');
-						newPiece.setAttribute('src', this.positions[i][j].src);
-						cell.appendChild(newPiece);
-						if(this.positions[i][j].selected)
-							cell.className += ' selected';
-					}
-					if(this.positions[i][j].highlighted) {
-						cell.className += ' highlight';
-						let that = this;
-						cell.addEventListener('click', function() {
-							that.selected.changePosition(parseInt(this.getAttribute('row')), parseInt(this.getAttribute('column')));
-							that.unselectCell();
-							that.drawBoard();
-						});
-					} else {
-						let that = this;
-						cell.addEventListener('click', function(){
-							that.selectCell(this.getAttribute('row'), this.getAttribute('column'));
-							that.drawBoard();
-						});
+			},
+			draw: function () {
+				for (let i in this.positions) {
+					for (let j in this.positions[i]) {
+						this.positions[i][j].draw();
 					}
 				}
-			}
-			if(model[`type${model.turn}`] === playerType.MACHINE){
-				movementPiece();
-			}
-		},
-		putInitialPieces: function (pieces) {
-			let remaining = pieces;
-			let currentRow = 0;
-			let currentColumn = 1;
-			while(remaining > 0)
-			{
-				this.positions[currentRow][currentColumn] = new model.WhitePiece(currentRow, currentColumn);
-				remaining--;
-				currentColumn += 2;
-				if(currentColumn > this.columns)
-					currentRow++;
-				currentColumn = currentColumn % this.columns;
-
-			}
-		},
-		draw: function () {
-			for (let i in this.positions) {
-				for (let j in this.positions[i]) {
-					this.positions[i][j].draw();
+			},
+			selectCell: function (row, column) {
+				if(this.selected != null) {
+					this.selected.selected = false;
+					this.clearHighlights();
 				}
-			}
-		},
-		selectCell: function (row, column) {
-			if(this.selected != null) {
-				this.selected.selected = false;
+				this.selected = null;
+				if(!this.positions[row][column].isEmpty() && model.turn === this.positions[row][column].color && isHuman()) {
+					this.selected = this.positions[row][column];
+					this.selected.selected = true;
+					this.selected.highlightMoves(this.selected.row, this.selected.column);
+				}
+				this.drawBoard();
+			},
+			unselectCell: function() {
+				if(this.selected != null){
+					this.selected.selected = false;
+				}
+				this.selected = null;
 				this.clearHighlights();
-			}
-			this.selected = null;
-			if(!this.positions[row][column].isEmpty() && model.turn === this.positions[row][column].color && isHuman()) {
-				this.selected = this.positions[row][column];
-				this.selected.selected = true;
-				this.selected.highlightMoves(this.selected.row, this.selected.column);
-			}
-			this.drawBoard();
-		},
-		unselectCell: function() {
-			if(this.selected != null){
-				this.selected.selected = false;
-			}
-			this.selected = null;
-			this.clearHighlights();
-		},
-		clearHighlights: function () {
-			for(let i = 0; i < this.rows; i++) {
-				for(let j = 0; j < this.columns; j++) {
-					this.positions[i][j].highlighted = false;
+			},
+			clearHighlights: function () {
+				for(let i = 0; i < this.rows; i++) {
+					for(let j = 0; j < this.columns; j++) {
+						this.positions[i][j].highlighted = false;
+					}
 				}
+			},
+			isOutOfBounds: function (row, column) {
+				return row >= model.board.rows || row < 0 || column >= model.board.columns || column < 0;
 			}
 		},
-		isOutOfBounds: function (row, column) {
-			return row >= model.board.rows || row < 0 || column >= model.board.columns || column < 0;
-		}
-	},
-	Piece: function (row, column) {
-		this.row = parseInt(row);
-		this.column = parseInt(column);
-		this.src = "";
-		this.selected = false;
-		this.highlighted = false;
-		this.canCapturePiece = false;
-		this.cardinalCapture = '';
-		this.changePosition = function (newRow, newColumn) {
-			model.board.positions[this.row][this.column] = new model.Piece(this.row, this.column);
-			if (Math.abs(this.row - newRow) > 1 || Math.abs(this.row - newRow) > 1) {
-				let eatenRowPos = (this.row + newRow)/2;
-				let eatenColumnPos = (this.column + newColumn)/2;
-				model.board.positions[eatenRowPos][eatenColumnPos] = new model.Piece(eatenRowPos, eatenColumnPos);
-				if (this.color === turns.WHITE) {
-					model.blackLeft--;
-				} else {
-					model.whiteLeft--;
+		Piece: function (row, column) {
+			this.row = parseInt(row);
+			this.column = parseInt(column);
+			this.src = "";
+			this.selected = false;
+			this.highlighted = false;
+			this.canCapturePiece = false;
+			this.cardinalCapture = '';
+			this.changePosition = function (newRow, newColumn) {
+				model.board.positions[this.row][this.column] = new model.Piece(this.row, this.column);
+				if (Math.abs(this.row - newRow) > 1 || Math.abs(this.row - newRow) > 1) {
+					let eatenRowPos = (this.row + newRow)/2;
+					let eatenColumnPos = (this.column + newColumn)/2;
+					model.board.positions[eatenRowPos][eatenColumnPos] = new model.Piece(eatenRowPos, eatenColumnPos);
+					if (this.color === turns.WHITE) {
+						model.blackLeft--;
+					} else {
+						model.whiteLeft--;
+					}
 				}
-			}
 
-			this.row = newRow;
-			this.column = newColumn;
-			model.board.positions[this.row][this.column] = this;
-			model.turn = model.turn === turns.WHITE ? turns.BLACK : turns.WHITE;
+				this.row = newRow;
+				this.column = newColumn;
+				model.board.positions[this.row][this.column] = this;
+				model.turn = model.turn === turns.WHITE ? turns.BLACK : turns.WHITE;
 
-			if (this.turnDama()){
-				if (model.turn === turns.BLACK) {
-					model.board.positions[this.row][this.column] = new model.WhiteDama(this.row, this.column);
-				} else {
-					model.board.positions[this.row][this.column] = new model.BlackDama(this.row, this.column);
+				if (this.turnDama()){
+					if (model.turn === turns.BLACK) {
+						model.board.positions[this.row][this.column] = new model.WhiteDama(this.row, this.column);
+					} else {
+						model.board.positions[this.row][this.column] = new model.BlackDama(this.row, this.column);
+					}
 				}
-			}
 
-		};
+			};
 
-		this.draw = function () {
-			if (this.src !== "") {
-				let cell = this.findCell();
-				let img = document.createElement("img");
-				img.src = this.src;
-				cell.appendChild(img);
-			}
-		};
-		this.highlightMove = function(row, column) {
-			if(!model.board.isOutOfBounds(row, column)) {
-				let cellTo = model.board.positions[row][column];
-				if (cellTo.isEmpty()) {
-					cellTo.highlighted = true;
-					return false;
+			this.draw = function () {
+				if (this.src !== "") {
+					let cell = this.findCell();
+					let img = document.createElement("img");
+					img.src = this.src;
+					cell.appendChild(img);
 				}
-				return this.color !== model.board.positions[row][column].color;
+			};
+			this.highlightMove = function(row, column) {
+				if(!model.board.isOutOfBounds(row, column)) {
+					let cellTo = model.board.positions[row][column];
+					if (cellTo.isEmpty()) {
+						cellTo.highlighted = true;
+						return false;
+					}
+					return this.color !== model.board.positions[row][column].color;
+				}
+			};
+			this.isEmpty = function () {
+				return true;
+			};
+			this.findCell = function () {
+				return document.querySelectorAll('div[row="'+this.row+'"][column="'+this.column+'"]')[0];
 			}
-		};
-		this.isEmpty = function () {
-			return true;
-		};
-		this.findCell = function () {
-			return document.querySelectorAll('div[row="'+this.row+'"][column="'+this.column+'"]')[0];
+		},
+		BlackPiece: function (row, column) {
+			this.__proto__ = new model.Piece(row, column);
+			this.src = 'img/black.png';
+			this.color = turns.BLACK;
+			this.isQueen = false;
+
+			this.highlightMoves = function (row, column) {
+				if (this.highlightMove(row-1, column-1)){
+					this.highlightMove(row-2, column-2);
+				}
+				if (this.highlightMove(row-1, column+1)){
+					this.highlightMove(row-2, column+2);
+				}
+			};
+			this.turnDama = function () {
+				return this.row === 0;
+			};
+			this.isEmpty = function () {
+				return false;
+			}
+		},
+		WhitePiece: function (row, column) {
+			this.__proto__ = new model.Piece(row, column);
+			this.src = 'img/white.png';
+			this.color = turns.WHITE;
+			this.isQueen = false;
+
+			this.highlightMoves = function (row, column) {
+				if (this.highlightMove(row+1, column+1)){
+					this.highlightMove(row+2, column+2);
+				}
+
+				if (this.highlightMove(row+1, column-1)){
+					this.highlightMove(row+2, column-2);
+				}
+			};
+
+			this.turnDama = function () {
+				return this.row === model.board.rows-1;
+			};
+
+			this.isEmpty = function () {
+				return false;
+			}
+		},
+		BlackDama: function (row, column) {
+			this.__proto__ = new model.BlackPiece(row, column);
+			this.src = 'img/blackdama.png';
+			this.isQueen = true;
+			this.highlightMoves = highlightMovesQueen;
+			this.isEmpty = isEmpty;
+		},
+		WhiteDama: function (row, column) {
+			this.__proto__ = new model.WhitePiece(row, column);
+			this.src = 'img/whitedama.png';
+			this.isQueen = true;
+			this.highlightMoves = highlightMovesQueen;
+			this.isEmpty = isEmpty;
 		}
-	},
-	BlackPiece: function (row, column) {
-		this.__proto__ = new model.Piece(row, column);
-		this.src = 'img/black.png';
-		this.color = turns.BLACK;
-		this.isQueen = false;
-
-		this.highlightMoves = function (row, column) {
-			if (this.highlightMove(row-1, column-1)){
-				this.highlightMove(row-2, column-2);
-			}
-			if (this.highlightMove(row-1, column+1)){
-				this.highlightMove(row-2, column+2);
-			}
-		};
-		this.turnDama = function () {
-			return this.row === 0;
-		};
-		this.isEmpty = function () {
-			return false;
-		}
-	},
-	WhitePiece: function (row, column) {
-		this.__proto__ = new model.Piece(row, column);
-		this.src = 'img/white.png';
-		this.color = turns.WHITE;
-		this.isQueen = false;
-
-		this.highlightMoves = function (row, column) {
-			if (this.highlightMove(row+1, column+1)){
-				this.highlightMove(row+2, column+2);
-			}
-
-			if (this.highlightMove(row+1, column-1)){
-				this.highlightMove(row+2, column-2);
-			}
-		};
-
-		this.turnDama = function () {
-			return this.row === model.board.rows-1;
-		};
-
-		this.isEmpty = function () {
-			return false;
-		}
-	},
-	BlackDama: function (row, column) {
-		this.__proto__ = new model.BlackPiece(row, column);
-		this.src = 'img/blackdama.png';
-		this.isQueen = true;
-		this.highlightMoves = highlightMovesQueen;
-		this.isEmpty = isEmpty;
-	},
-	WhiteDama: function (row, column) {
-		this.__proto__ = new model.WhitePiece(row, column);
-		this.src = 'img/whitedama.png';
-		this.isQueen = true;
-		this.highlightMoves = highlightMovesQueen;
-		this.isEmpty = isEmpty;
-	}
-};
+	};
+}
 
 let init = function() {
+	model = getModel();
 	startWatch();
 	model.board.initBoard(8, 8, 12);
 	model.board.drawBoard();
@@ -391,6 +396,7 @@ function movementPiece(){
 	let piecesCanMove = [];
 	let canCapture = false;
 	let pieceCapture = '';
+
 	if(isWhiteTurn()){
 		model.board.positions.filter(function(row){
 			row.filter(function (piece){
