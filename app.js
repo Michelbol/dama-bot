@@ -136,38 +136,14 @@ function getModel(){
 						}
 						if(this.positions[i][j].highlighted) {
 							cell.className += ' highlight';
-							let that = this;
-							cell.addEventListener('click', function() {
-								that.selected.changePosition(parseInt(this.getAttribute('row')), parseInt(this.getAttribute('column')));
-								that.unselectCell();
-								that.drawBoard();
-							});
+							cell.addEventListener('click', clickCellHighlighted);
 						} else {
-							let that = this;
-							cell.addEventListener('click', function(){
-								that.selectCell(this.getAttribute('row'), this.getAttribute('column'));
-								that.drawBoard();
-							});
+							cell.addEventListener('click', clickCell);
 						}
 					}
 				}
-				if(model[`type${model.turn}`] === playerType.MACHINE){
+				if(isMachineTurn()){
 					movementPiece();
-				}
-			},
-			putInitialPieces: function (pieces) {
-				let remaining = pieces;
-				let currentRow = 0;
-				let currentColumn = 1;
-				while(remaining > 0)
-				{
-					this.positions[currentRow][currentColumn] = new model.WhitePiece(currentRow, currentColumn);
-					remaining--;
-					currentColumn += 2;
-					if(currentColumn > this.columns)
-						currentRow++;
-					currentColumn = currentColumn % this.columns;
-
 				}
 			},
 			draw: function () {
@@ -214,13 +190,14 @@ function getModel(){
 			this.src = "";
 			this.selected = false;
 			this.highlighted = false;
-			this.canCapturePiece = false;
-			this.cardinalCapture = '';
+			cleanCaptureInformation(this);
 			this.changePosition = function (newRow, newColumn) {
 				model.board.positions[this.row][this.column] = new model.Piece(this.row, this.column);
+				let eatenRowPos;
+				let eatenColumnPos;
 				if (Math.abs(this.row - newRow) > 1 || Math.abs(this.row - newRow) > 1) {
-					let eatenRowPos = (this.row + newRow)/2;
-					let eatenColumnPos = (this.column + newColumn)/2;
+					eatenRowPos = (this.row + newRow)/2;
+					eatenColumnPos = (this.column + newColumn)/2;
 					model.board.positions[eatenRowPos][eatenColumnPos] = new model.Piece(eatenRowPos, eatenColumnPos);
 					if (this.color === turns.WHITE) {
 						model.blackLeft--;
@@ -232,18 +209,24 @@ function getModel(){
 				this.row = newRow;
 				this.column = newColumn;
 				model.board.positions[this.row][this.column] = this;
-				model.turn = model.turn === turns.WHITE ? turns.BLACK : turns.WHITE;
-
 				if (this.turnDama()){
-					if (model.turn === turns.BLACK) {
+					if (this.color === turns.WHITE) {
 						model.board.positions[this.row][this.column] = new model.WhiteDama(this.row, this.column);
 					} else {
 						model.board.positions[this.row][this.column] = new model.BlackDama(this.row, this.column);
 					}
 				}
-
+				cleanCaptureInformation(this);
+				if(typeof eatenRowPos !== "undefined"){
+					if(canEatPiece(model.board.positions[this.row][this.column])){
+						if(!isMachineTurn()){
+							alert('Você pode comer mais peças');
+						}
+						return;
+					}
+				}
+				model.turn = model.turn === turns.WHITE ? turns.BLACK : turns.WHITE;
 			};
-
 			this.draw = function () {
 				if (this.src !== "") {
 					let cell = this.findCell();
@@ -444,8 +427,7 @@ function movePiece(piece, cardinal){
 		newPiece = eval(jsLcfirst(cardinal))(newPiece);
 	}
 	piece.changePosition(newPiece.row, newPiece.column);
-	piece.canCapturePiece = false;
-	piece.cardinalCapture = '';
+	cleanCaptureInformation(piece);
 	model.board.unselectCell();
 	model.board.drawBoard();
 }
@@ -520,7 +502,6 @@ function canMovePiece(piece, cardinalPoint, original){
 		//If has original, is the second calling and still has some piece.
 		return false;
 	}
-
 }
 
 function canMoveNorthEast(piece, original){
@@ -584,6 +565,49 @@ function isEmpty (){
 
 function jsLcfirst(string) {
 	return string.charAt(0).toLowerCase() + string.slice(1);
+}
+
+function clickCell(){
+	model.board.selectCell(
+		this.getAttribute('row'),
+		this.getAttribute('column')
+	);
+	model.board.drawBoard();
+}
+
+function clickCellHighlighted(){
+	model.board.selected.changePosition(
+		parseInt(this.getAttribute('row')),
+		parseInt(this.getAttribute('column'))
+	);
+	model.board.unselectCell();
+	model.board.drawBoard();
+}
+
+function canEatPiece(piece) {
+	if (piece.color === turns.WHITE) {
+		if(canMoveWhite(piece)){
+			return piece.canCapturePiece;
+		}
+	}
+	if (piece.color === turns.BLACK) {
+		if(canMoveBlack(piece)){
+			return piece.canCapturePiece;
+		}
+	}
+	return false;
+}
+
+function clickPiece(piece){
+	document.querySelectorAll('div[row="'+piece.row+'"][column="'+piece.column+'"]')[0].click();
+}
+
+function cleanCaptureInformation(piece){
+	piece.canCapturePiece = false;
+	piece.cardinalCapture = '';
+}
+function isMachineTurn(){
+	return model[`type${model.turn}`] === playerType.MACHINE;
 }
 
 init();
