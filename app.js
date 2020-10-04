@@ -25,7 +25,9 @@ const cardinalPointsAvailableBlack = {
 	NORTHEAST: 'NorthEast',
 }
 
+let restartGame = { needRestart: false };
 let model = getModel();
+let rounds = [];
 
 function getModel(){
 	return {
@@ -48,7 +50,7 @@ function getModel(){
 				let currentColumn = 1;
 				while(remaining > 0)
 				{
-					this.positions[currentRow][currentColumn] = new model.WhitePiece(currentRow, currentColumn);
+					model.board.positions[currentRow][currentColumn] = new model.WhitePiece(currentRow, currentColumn);
 					if(currentColumn === this.columns-1){
 						currentColumn++;
 					}else if(currentColumn === this.columns-2){
@@ -70,7 +72,7 @@ function getModel(){
 				let currentColumn = this.columns-2;
 				while(remaining > 0)
 				{
-					this.positions[currentRow][currentColumn] = new model.BlackPiece(currentRow, currentColumn);
+					model.board.positions[currentRow][currentColumn] = new model.BlackPiece(currentRow, currentColumn);
 					currentColumn-=2;
 					if(currentColumn < 0){
 						currentRow--;
@@ -90,9 +92,9 @@ function getModel(){
 				this.rows = rows;
 				this.columns = columns;
 				for(let i = 0; i < rows; i++) {
-					this.positions[i] = [];
+					model.board.positions[i] = [];
 					for(let j = 0; j < columns; j++){
-						this.positions[i][j] = new model.Piece(i, j);
+						model.board.positions[i][j] = new model.Piece(i, j);
 					}
 				}
 				this.addWhitePieces(piecesPerSide);
@@ -127,14 +129,15 @@ function getModel(){
 				for(let i = 0; i < rows; i++) {
 					for(let j = 0; j < columns; j++) {
 						let cell = document.querySelectorAll('div[row="'+i+'"][column="'+j+'"]')[0];
-						if(!this.positions[i][j].isEmpty()) {
+						if(!model.board.positions[i][j].isEmpty()) {
 							let newPiece = document.createElement('img');
-							newPiece.setAttribute('src', this.positions[i][j].src);
+							newPiece.setAttribute('src', model.board.positions[i][j].src);
 							cell.appendChild(newPiece);
-							if(this.positions[i][j].selected)
+							if(model.board.positions[i][j].selected){
 								cell.className += ' selected';
+							}
 						}
-						if(this.positions[i][j].highlighted) {
+						if(model.board.positions[i][j].highlighted) {
 							cell.className += ' highlight';
 							cell.addEventListener('click', clickCellHighlighted);
 						} else {
@@ -147,9 +150,9 @@ function getModel(){
 				}
 			},
 			draw: function () {
-				for (let i in this.positions) {
-					for (let j in this.positions[i]) {
-						this.positions[i][j].draw();
+				for (let i in model.board.positions) {
+					for (let j in model.board.positions[i]) {
+						model.board.positions[i][j].draw();
 					}
 				}
 			},
@@ -159,8 +162,8 @@ function getModel(){
 					this.clearHighlights();
 				}
 				this.selected = null;
-				if(!this.positions[row][column].isEmpty() && model.turn === this.positions[row][column].color && isHuman()) {
-					this.selected = this.positions[row][column];
+				if(!model.board.positions[row][column].isEmpty() && model.turn === model.board.positions[row][column].color && isHuman()) {
+					this.selected = model.board.positions[row][column];
 					this.selected.selected = true;
 					this.selected.highlightMoves(this.selected.row, this.selected.column);
 				}
@@ -176,7 +179,7 @@ function getModel(){
 			clearHighlights: function () {
 				for(let i = 0; i < this.rows; i++) {
 					for(let j = 0; j < this.columns; j++) {
-						this.positions[i][j].highlighted = false;
+						model.board.positions[i][j].highlighted = false;
 					}
 				}
 			},
@@ -334,17 +337,26 @@ function startWatch(){
 				if(!obj.setup){
 					if (model.whiteLeft === 0) {
 						alert("Jogador Preto Ganhou!");
-						init();
+						restartGame.needRestart = true;
 					}
 					if (model.blackLeft === 0) {
 						alert("Jogador Branco Ganhou!");
-						init();
+						restartGame.needRestart = true;
 					}
 				}
 			}
 			return true;
 		}
 	});
+	restartGame = new Proxy(restartGame, {
+		set: function(obj, prop, newValue){
+			if(prop === 'needRestart'){
+				if(newValue){
+					init();
+				}
+			}
+		}
+	})
 }
 
 function updateQtdPiecesLeft(){
@@ -379,6 +391,7 @@ function movementPiece(){
 	let piecesCanMove = [];
 	let canCapture = false;
 	let pieceCapture = '';
+	alert('computador vai mover');
 
 	if(isWhiteTurn()){
 		model.board.positions.filter(function(row){
@@ -463,22 +476,61 @@ function canMoveToPosition(piece, cardinalPoint){
  * @returns {*}
  */
 function canMoveWhite(piece){
+	let result = false;
 	if(piece.isQueen){
-		return canMoveSouthWest(piece) || canMoveSouthEast(piece) || canMoveNorthEast(piece) || canMoveNorthWest(piece);
+		if(canMoveSouthWest(piece)){
+			result = true;
+		}
+		if(canMoveSouthEast(piece)){
+			result = true;
+		}
+		if(canMoveNorthEast(piece)){
+			result = true;
+		}
+		if(canMoveNorthWest(piece)){
+			result = true;
+		}
+		return result;
 	}
-	return canMoveSouthWest(piece) || canMoveSouthEast(piece);
+	if(canMoveSouthWest(piece)){
+		result = true;
+	}
+	if(canMoveSouthEast(piece)){
+		result = true;
+	}
+	return result;
 }
 
 /**
- * First will see north because with is in the top
+ * First will see north because with is in the top.
+ * The algorithm needs to execute all movements, because they can have a change of eat a piece.
  * @param piece
  * @returns {*}
  */
 function canMoveBlack(piece){
+	let result = false;
 	if(piece.isQueen){
-		return canMoveNorthEast(piece) || canMoveNorthWest(piece) || canMoveSouthWest(piece) || canMoveSouthEast(piece);
+		if(canMoveNorthEast(piece)){
+			result = true;
+		}
+		if(canMoveNorthWest(piece)){
+			result = true;
+		}
+		if(canMoveSouthWest(piece)){
+			result = true;
+		}
+		if(canMoveSouthEast(piece)){
+			result = true;
+		}
+		return result;
 	}
-	return canMoveNorthEast(piece) || canMoveNorthWest(piece);
+	if(canMoveNorthEast(piece)){
+		result = true;
+	}
+	if(canMoveNorthWest(piece)){
+		result = true;
+	}
+	return result;
 }
 
 function canMovePiece(piece, cardinalPoint, original){
@@ -576,6 +628,7 @@ function clickCell(){
 }
 
 function clickCellHighlighted(){
+	rounds.push(cloneModel(model))
 	model.board.selected.changePosition(
 		parseInt(this.getAttribute('row')),
 		parseInt(this.getAttribute('column'))
@@ -598,16 +651,65 @@ function canEatPiece(piece) {
 	return false;
 }
 
-function clickPiece(piece){
-	document.querySelectorAll('div[row="'+piece.row+'"][column="'+piece.column+'"]')[0].click();
-}
-
 function cleanCaptureInformation(piece){
 	piece.canCapturePiece = false;
 	piece.cardinalCapture = '';
 }
+
 function isMachineTurn(){
 	return model[`type${model.turn}`] === playerType.MACHINE;
 }
+function isMoveMoreThenOnePosition(oldRow, newRow){
+ return Math.abs(this.row - newRow) > 1;
+}
+
+function cloneModel(model){
+	let positions = [];
+	for (let i = 0; i < model.board.positions.length; i++){
+		for (let j = 0; j < model.board.positions[i].length; j++){
+			if(!Array.isArray(positions[i])){
+				positions[i] = [];
+			}
+			if(model.board.positions[i][j].src === ''){
+				positions[i][j] = new model.Piece(i, j);
+				continue;
+			}
+			if(model.board.positions[i][j].color === turns.WHITE){
+				if(model.board.positions[i][j].isQueen){
+					positions[i][j] = new model.WhiteDama(i, j);
+					continue;
+				}
+				positions[i][j] = new model.WhitePiece(i, j);
+				continue;
+			}
+			if(model.board.positions[i][j].color === turns.BLACK){
+				if(model.board.positions[i][j].isQueen){
+					positions[i][j] = new model.BlackDama(i, j);
+					continue;
+				}
+				positions[i][j] = new model.BlackPiece(i, j);
+				continue;
+			}
+		}
+	}
+	return {
+		whiteLeft: model.whiteLeft,
+		blackLeft: model.blackLeft,
+		positions: positions
+	};
+}
+
+function turnBackRound(){
+	if(rounds.length === 0 ){
+		return;
+	}
+	let round = rounds.pop();
+	model.board.positions = round.positions;
+	model.whiteLeft = round.whiteLeft;
+	model.blackLeft = round.blackLeft;
+	model.board.unselectCell();
+	model.board.drawBoard();
+}
+
 
 init();
