@@ -391,7 +391,6 @@ function movementPiece(){
 	let piecesCanMove = [];
 	let canCapture = false;
 	let pieceCapture = '';
-	alert('computador vai mover');
 
 	if(isWhiteTurn()){
 		model.board.positions.filter(function(row){
