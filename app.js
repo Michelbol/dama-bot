@@ -8,6 +8,11 @@ const playerType = {
 	MACHINE: 'machine'
 }
 
+const machineType = {
+	IA: 'ia',
+	RANDOM: 'random'
+}
+
 const cardinalPointsAvailable = {
 	NORTHWEST: 'NorthWest',
 	NORTHEAST: 'NorthEast',
@@ -37,6 +42,7 @@ function getModel(){
 		blackLeft: 0,
 		typeWhite: playerType.HUMAN,
 		typeBlack: playerType.MACHINE,
+		typeMachine: machineType.IA,
 		board: {
 			rows: 0,
 			columns: 0,
@@ -150,8 +156,8 @@ function getModel(){
 				}
 			},
 			draw: function () {
-				for (let i in model.board.positions) {
-					for (let j in model.board.positions[i]) {
+				for (let i = 0; i < model.board.positions.length; i++){
+					for (let j = 0; j < model.board.positions.length; j++){
 						model.board.positions[i][j].draw();
 					}
 				}
@@ -194,41 +200,61 @@ function getModel(){
 			this.selected = false;
 			this.highlighted = false;
 			cleanCaptureInformation(this);
-			this.changePosition = function (newRow, newColumn) {
-				model.board.positions[this.row][this.column] = new model.Piece(this.row, this.column);
+			this.changePosition = function (newRow, newColumn, game = null) {
+				let reference;
+				if(game === null){
+					reference = model;
+				}else{
+					reference = game;
+				}
+				reference.board.positions[this.row][this.column] = new reference.Piece(this.row, this.column);
 				let eatenRowPos;
 				let eatenColumnPos;
+				let utility = 0;
 				if (Math.abs(this.row - newRow) > 1 || Math.abs(this.row - newRow) > 1) {
+					utility++;
 					eatenRowPos = (this.row + newRow)/2;
 					eatenColumnPos = (this.column + newColumn)/2;
-					model.board.positions[eatenRowPos][eatenColumnPos] = new model.Piece(eatenRowPos, eatenColumnPos);
+					if(reference.board.positions[eatenRowPos][eatenColumnPos].src === ''){
+						console.log('q');
+					}
+					if(reference.board.positions[eatenRowPos][eatenColumnPos] instanceof reference.WhiteDama){
+						utility++;
+					}
+					if(reference.board.positions[eatenRowPos][eatenColumnPos] instanceof reference.BlackDama){
+						utility++;
+					}
+					reference.board.positions[eatenRowPos][eatenColumnPos] = new reference.Piece(eatenRowPos, eatenColumnPos);
 					if (this.color === turns.WHITE) {
-						model.blackLeft--;
+						reference.blackLeft--;
 					} else {
-						model.whiteLeft--;
+						reference.whiteLeft--;
 					}
 				}
 
 				this.row = newRow;
 				this.column = newColumn;
-				model.board.positions[this.row][this.column] = this;
+				reference.board.positions[this.row][this.column] = this;
 				if (this.turnDama()){
 					if (this.color === turns.WHITE) {
-						model.board.positions[this.row][this.column] = new model.WhiteDama(this.row, this.column);
+						reference.board.positions[this.row][this.column] = new reference.WhiteDama(this.row, this.column);
 					} else {
-						model.board.positions[this.row][this.column] = new model.BlackDama(this.row, this.column);
+						reference.board.positions[this.row][this.column] = new reference.BlackDama(this.row, this.column);
 					}
+					utility++;
 				}
 				cleanCaptureInformation(this);
 				if(typeof eatenRowPos !== "undefined"){
-					if(canEatPiece(model.board.positions[this.row][this.column])){
+					if(canEatPiece(reference.board.positions[this.row][this.column])){
 						if(!isMachineTurn()){
 							alert('Você pode comer mais peças');
 						}
-						return;
+						utility++;
+						return utility;
 					}
 				}
-				model.turn = model.turn === turns.WHITE ? turns.BLACK : turns.WHITE;
+				reference.turn = reference.turn === turns.WHITE ? turns.BLACK : turns.WHITE;
+				return utility;
 			};
 			this.draw = function () {
 				if (this.src !== "") {
@@ -254,12 +280,17 @@ function getModel(){
 			this.findCell = function () {
 				return document.querySelectorAll('div[row="'+this.row+'"][column="'+this.column+'"]')[0];
 			}
+			this.clone = function (){
+				return new model.Piece(this.row, this.column)
+			}
 		},
-		BlackPiece: function (row, column) {
+		BlackPiece: function (row, column, canCapturePiece = false, cardinalCapture = '') {
 			this.__proto__ = new model.Piece(row, column);
 			this.src = 'img/black.png';
 			this.color = turns.BLACK;
 			this.isQueen = false;
+			this.canCapturePiece = canCapturePiece;
+			this.cardinalCapture = cardinalCapture;
 
 			this.highlightMoves = function (row, column) {
 				if (this.highlightMove(row-1, column-1)){
@@ -274,13 +305,18 @@ function getModel(){
 			};
 			this.isEmpty = function () {
 				return false;
-			}
+			};
+			this.clone = function (){
+				return new model.BlackPiece(this.row, this.column, this.canCapturePiece, this.cardinalCapture);
+			};
 		},
-		WhitePiece: function (row, column) {
+		WhitePiece: function (row, column, canCapturePiece = false, cardinalCapture = '') {
 			this.__proto__ = new model.Piece(row, column);
 			this.src = 'img/white.png';
 			this.color = turns.WHITE;
 			this.isQueen = false;
+			this.canCapturePiece = canCapturePiece;
+			this.cardinalCapture = cardinalCapture;
 
 			this.highlightMoves = function (row, column) {
 				if (this.highlightMove(row+1, column+1)){
@@ -298,21 +334,35 @@ function getModel(){
 
 			this.isEmpty = function () {
 				return false;
-			}
+			};
+
+			this.clone = function (){
+				return new model.WhitePiece(this.row, this.column, this.canCapturePiece, this.cardinalCapture)
+			};
 		},
-		BlackDama: function (row, column) {
+		BlackDama: function (row, column, canCapturePiece = false, cardinalCapture = '') {
 			this.__proto__ = new model.BlackPiece(row, column);
 			this.src = 'img/blackdama.png';
 			this.isQueen = true;
+			this.canCapturePiece = canCapturePiece;
+			this.cardinalCapture = cardinalCapture;
 			this.highlightMoves = highlightMovesQueen;
 			this.isEmpty = isEmpty;
+			this.clone = function (){
+				return new model.BlackDama(this.row, this.column, this.canCapturePiece, this.cardinalCapture)
+			};
 		},
-		WhiteDama: function (row, column) {
+		WhiteDama: function (row, column, canCapturePiece = false, cardinalCapture = '') {
 			this.__proto__ = new model.WhitePiece(row, column);
 			this.src = 'img/whitedama.png';
 			this.isQueen = true;
+			this.canCapturePiece = canCapturePiece;
+			this.cardinalCapture = cardinalCapture;
 			this.highlightMoves = highlightMovesQueen;
 			this.isEmpty = isEmpty;
+			this.clone = function (){
+				return new model.WhiteDama(this.row, this.column, this.canCapturePiece, this.cardinalCapture)
+			};
 		}
 	};
 }
@@ -387,61 +437,124 @@ function isHuman(){
 	return model[`type${model.turn}`] === playerType.HUMAN;
 }
 
-function movementPiece(){
-	let piecesCanMove = [];
-	let canCapture = false;
-	let pieceCapture = '';
-
-	if(isWhiteTurn()){
-		model.board.positions.filter(function(row){
-			row.filter(function (piece){
-				if(piece.color === turns.WHITE){
-					if(canMoveWhite(piece)){
-						if(piece.canCapturePiece){
-							canCapture = true;
-							pieceCapture = piece;
-						}
-						piecesCanMove.push(piece);
-					}
-				}
-				return false;
-			});
-		});
-		return;
+function getAllMovements(game = null){
+	let reference;
+	if(game === null){
+		reference = model;
+	}else{
+		reference = game;
 	}
-	if(isBlackTurn()){
-		model.board.positions.filter(function(row){
-			row.filter(function (piece){
-				if(piece.color === turns.BLACK){
-					if(canMoveBlack(piece)){
-						if(piece.canCapturePiece){
-							canCapture = true;
-							pieceCapture = piece;
-						}
-						piecesCanMove.push(piece);
-					}
-				}
-				return false;
-			});
-		});
+	let piecesCanMove = AllMovementsPlayerTurn(reference);
+	let movements = [];
+	for (let i = 0; i < piecesCanMove.movements.length; i++){
+		let piece = piecesCanMove.movements[i];
+		for (let j = 0; j < piece.places.length; j++){
+			movements.push({piece: piece.piece.clone(), place: piece.places[j]});
+		}
 	}
-	if(pieceCapture){
-		movePiece(pieceCapture, pieceCapture.cardinalCapture)
-		return;
-	}
-	let pieceToMove = chooseRandomItemIntoArray(piecesCanMove);
-	movePiece(pieceToMove, chooseRandomItemIntoArray(placesToMove(pieceToMove)));
+	return movements;
 }
 
-function movePiece(piece, cardinal){
-	let newPiece = eval(jsLcfirst(cardinal))(piece);
-	if(piece.canCapturePiece){
-		newPiece = eval(jsLcfirst(cardinal))(newPiece);
+function AllMovementsPlayerTurn(game = null){
+	let movements = [];
+	let pieceCapture = '';
+
+	model.board.positions.filter(function(row){
+		row.filter(function (piece){
+			if(game === null){
+				if(piece.color === model.turn && piece.src !== ''){
+					let movement;
+					if(model.turn === turns.BLACK){
+						movement = canMoveBlack(piece);
+					}else{
+						movement = canMoveWhite(piece);
+					}
+					if(movement.canMove){
+						if(piece.canCapturePiece){
+							if(pieceCapture !== ''){
+								cleanCaptureInformation(model.board.positions[pieceCapture.row][pieceCapture.column]);
+							}
+							pieceCapture = piece.clone();
+						}
+						movements.push({piece: piece.clone(), places: movement.places});
+					}
+				}
+				return false;
+			}
+			if(piece.color === game.turn && piece.src !== ''){
+				let movement;
+				if(game.turn === turns.BLACK){
+					movement = canMoveBlack(piece);
+				}else{
+					movement = canMoveWhite(piece);
+				}
+				if(movement.canMove){
+					if(piece.canCapturePiece){
+						pieceCapture = piece.clone();
+					}
+					movements.push({piece: piece.clone(), places: movement.places});
+				}
+			}
+			return false;
+		});
+	});
+	return { movements: movements, pieceCapture: pieceCapture};
+}
+let executionTime = Date.now();
+
+function startTime(){
+	executionTime = Date.now();
+}
+
+function isTimeOut(){
+	return (Date.now() - executionTime)/1000 > 1;
+}
+
+function movementPiece(game = null){
+	let movement;
+	if(model.typeMachine === machineType.RANDOM){
+		let { movements, pieceCapture } = AllMovementsPlayerTurn();
+		if(pieceCapture){
+			movePiece(pieceCapture, pieceCapture.cardinalCapture)
+			return;
+		}
+		movement = chooseRandomMovement(movements);
+	}else{
+		startTime();
+		movement = decisionMinMax();
+		let time = Date.now() - executionTime;
+		console.log("A decisão demorou: " + time/1000 +" segundos");
 	}
-	piece.changePosition(newPiece.row, newPiece.column);
+	printMovement(movement);
+	movePiece(movement.piece, movement.place, game);
+}
+
+function chooseRandomMovement(movements){
+	let piece = chooseRandomItemIntoArray(movements);
+	return {piece: piece.piece.clone(), place: chooseRandomItemIntoArray(piece.places)};
+}
+
+function movePiece(piece, cardinal, game = null){
+	let reference;
+	if(game === null){
+		reference = model;
+	}else{
+		reference = game;
+	}
+	let newPiece = moveToPosition(cardinal, piece);
+	if(piece.canCapturePiece){
+		newPiece = moveToPosition(cardinal, newPiece);
+	}
+	if(reference.board.isOutOfBounds(newPiece.row, newPiece.column)){
+		return;
+	}
+	let utility = piece.changePosition(newPiece.row, newPiece.column, game);
 	cleanCaptureInformation(piece);
-	model.board.unselectCell();
-	model.board.drawBoard();
+	if(game === null){
+		reference.board.unselectCell();
+		reference.board.drawBoard();
+	}
+	return utility;
 }
 
 function placesToMove(piece){
@@ -466,7 +579,16 @@ function chooseRandomItemIntoArray(data){
 }
 
 function canMoveToPosition(piece, cardinalPoint){
-	return eval(`canMove${cardinalPoint}`)(piece);
+	switch (cardinalPoint){
+		case cardinalPointsAvailable.NORTHWEST:
+			return canMoveNorthWest(piece);
+		case cardinalPointsAvailable.NORTHEAST:
+			return canMoveNorthEast(piece);
+		case cardinalPointsAvailable.SOUTHEAST:
+			return canMoveSouthEast(piece);
+		case cardinalPointsAvailable.SOUTHWEST:
+			return canMoveSouthWest(piece);
+	}
 }
 
 /**
@@ -476,28 +598,35 @@ function canMoveToPosition(piece, cardinalPoint){
  */
 function canMoveWhite(piece){
 	let result = false;
+	let places = [];
 	if(piece.isQueen){
 		if(canMoveSouthWest(piece)){
 			result = true;
+			places.push(cardinalPointsAvailable.SOUTHWEST);
 		}
 		if(canMoveSouthEast(piece)){
 			result = true;
+			places.push(cardinalPointsAvailable.SOUTHEAST);
 		}
 		if(canMoveNorthEast(piece)){
 			result = true;
+			places.push(cardinalPointsAvailable.NORTHEAST);
 		}
 		if(canMoveNorthWest(piece)){
 			result = true;
+			places.push(cardinalPointsAvailable.NORTHWEST);
 		}
-		return result;
+		return {canMove: result, places: places};
 	}
 	if(canMoveSouthWest(piece)){
 		result = true;
+		places.push(cardinalPointsAvailable.SOUTHWEST);
 	}
 	if(canMoveSouthEast(piece)){
 		result = true;
+		places.push(cardinalPointsAvailable.SOUTHEAST);
 	}
-	return result;
+	return {canMove: result, places: places};
 }
 
 /**
@@ -508,32 +637,39 @@ function canMoveWhite(piece){
  */
 function canMoveBlack(piece){
 	let result = false;
+	let places = [];
 	if(piece.isQueen){
 		if(canMoveNorthEast(piece)){
 			result = true;
+			places.push(cardinalPointsAvailable.NORTHEAST);
 		}
 		if(canMoveNorthWest(piece)){
 			result = true;
+			places.push(cardinalPointsAvailable.NORTHWEST);
 		}
 		if(canMoveSouthWest(piece)){
 			result = true;
+			places.push(cardinalPointsAvailable.SOUTHWEST);
 		}
 		if(canMoveSouthEast(piece)){
 			result = true;
+			places.push(cardinalPointsAvailable.SOUTHEAST);
 		}
-		return result;
+		return {canMove: result, places: places};
 	}
 	if(canMoveNorthEast(piece)){
 		result = true;
+		places.push(cardinalPointsAvailable.NORTHEAST);
 	}
 	if(canMoveNorthWest(piece)){
 		result = true;
+		places.push(cardinalPointsAvailable.NORTHWEST);
 	}
-	return result;
+	return {canMove: result, places: places};
 }
 
 function canMovePiece(piece, cardinalPoint, original){
-	let movementPiece = eval(jsLcfirst(cardinalPoint))(piece);
+	let movementPiece = moveToPosition(cardinalPoint, piece);
 	if(model.board.isOutOfBounds(movementPiece.row, movementPiece.column)){
 		return false;
 	}
@@ -569,6 +705,19 @@ function canMoveSouthWest(piece, original){
 
 function canMoveNorthWest(piece, original){
 	return canMovePiece(piece, cardinalPointsAvailable.NORTHWEST, original);
+}
+
+function moveToPosition(cardinalPoint, piece){
+	switch (cardinalPoint){
+		case cardinalPointsAvailable.NORTHWEST:
+			return northWest(piece);
+		case cardinalPointsAvailable.NORTHEAST:
+			return northEast(piece);
+		case cardinalPointsAvailable.SOUTHEAST:
+			return southEast(piece);
+		case cardinalPointsAvailable.SOUTHWEST:
+			return southWest(piece);
+	}
 }
 
 function north(piece){
@@ -614,7 +763,7 @@ function isEmpty (){
 	return false;
 }
 
-function jsLcfirst(string) {
+function jsLcFirst(string) {
 	return string.charAt(0).toLowerCase() + string.slice(1);
 }
 
@@ -623,11 +772,10 @@ function clickCell(){
 		this.getAttribute('row'),
 		this.getAttribute('column')
 	);
-	model.board.drawBoard();
 }
 
 function clickCellHighlighted(){
-	rounds.push(cloneModel(model))
+	rounds.push(cloneModel(model));
 	model.board.selected.changePosition(
 		parseInt(this.getAttribute('row')),
 		parseInt(this.getAttribute('column'))
@@ -638,12 +786,12 @@ function clickCellHighlighted(){
 
 function canEatPiece(piece) {
 	if (piece.color === turns.WHITE) {
-		if(canMoveWhite(piece)){
+		if(canMoveWhite(piece).canMove){
 			return piece.canCapturePiece;
 		}
 	}
 	if (piece.color === turns.BLACK) {
-		if(canMoveBlack(piece)){
+		if(canMoveBlack(piece).canMove){
 			return piece.canCapturePiece;
 		}
 	}
@@ -655,11 +803,15 @@ function cleanCaptureInformation(piece){
 	piece.cardinalCapture = '';
 }
 
-function isMachineTurn(){
-	return model[`type${model.turn}`] === playerType.MACHINE;
+function isMachineTurn(game = null){
+	if(game === null){
+		return model[`type${model.turn}`] === playerType.MACHINE;
+	}
+	return game[`type${game.turn}`] === playerType.MACHINE;
 }
+
 function isMoveMoreThenOnePosition(oldRow, newRow){
- return Math.abs(this.row - newRow) > 1;
+	return Math.abs(oldRow - newRow) > 1;
 }
 
 function cloneModel(model){
@@ -687,7 +839,6 @@ function cloneModel(model){
 					continue;
 				}
 				positions[i][j] = new model.BlackPiece(i, j);
-				continue;
 			}
 		}
 	}
@@ -710,5 +861,101 @@ function turnBackRound(){
 	model.board.drawBoard();
 }
 
-
 init();
+
+function decisionMinMax(){
+	let movement;
+	let roundMovements = getAllMovements();
+	let utility = Number.NEGATIVE_INFINITY;
+	for (let i = 0; i < roundMovements.length; i++){
+		let newGame = newModel(model);
+		let number = movePiece(roundMovements[i].piece.clone(), roundMovements[i].place, newGame);
+		number += valueMin(newGame);
+
+		if(number >= utility) {
+			utility = number;
+			movement = {piece: roundMovements[i].piece.clone(), place: roundMovements[i].place};
+		}
+	}
+	return movement;
+}
+
+function newModel(game){
+	let newGame = getModel();
+	let {whiteLeft, blackLeft, positions} = cloneModel(game);
+	newGame.whiteLeft = whiteLeft;
+	newGame.blackLeft = blackLeft;
+	newGame.board.positions = positions;
+	newGame.turn = game.turn;
+	return newGame;
+}
+
+function valueMax(model){
+	if(isTimeOut()){
+		return 0;
+	}
+	if(isFinal(model)){
+		return calcUtility(model);
+	}
+	let utility = Number.NEGATIVE_INFINITY;
+	let movements = getAllMovements(model);
+	if(movements.length === 0){
+		return 1/2;
+	}
+	let localUtility = 0;
+	for (let i = 0; i < movements.length; i++){
+		let newGame = newModel(model);
+		localUtility += movePiece(movements[i].piece.clone(), movements[i].place, newGame);
+		localUtility += valueMin(newGame);
+		utility = Math.max(utility, localUtility);
+	}
+	return utility;
+}
+
+function valueMin(model){
+	if(isTimeOut()){
+		return 0;
+	}
+	if(isFinal(model)){
+		return calcUtility(model);
+	}
+	let utility = Number.POSITIVE_INFINITY;
+	let movements = getAllMovements(model);
+	if(movements.length === 0){
+		return 1/2;
+	}
+	let localUtility = 0;
+	for (let i = 0; i < movements.length; i++){
+		let newGame = newModel(model);
+		localUtility = movePiece(movements[i].piece.clone(), movements[i].place, newGame);
+		localUtility += valueMax(newGame);
+		utility = Math.min(utility, localUtility);
+	}
+	return utility;
+}
+
+function isFinal(model){
+	return model.whiteLeft === 0 || model.blackLeft === 0;
+}
+
+function calcUtility(model){
+	if(model.typeWhite === playerType.MACHINE){
+		if(model.whiteLeft === 0){
+			return -2;
+		}
+		return 2;
+	}
+	if(model.typeBlack === playerType.MACHINE){
+		if(model.blackLeft === 0){
+			return -2;
+		}
+		return 2;
+	}
+}
+
+function printMovement(movement){
+	console.log("{Piece:{Row:"+movement.piece.row+", Column: "+movement.piece.column+"}, Place: "+movement.place+"}");
+}
+function printPiece(piece){
+	console.log("{Piece:{Row:"+piece.row+", Column: "+piece.column+"}");
+}
