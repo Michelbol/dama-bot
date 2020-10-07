@@ -543,7 +543,9 @@ function movePiece(piece, cardinal, game = null){
 	}
 	let newPiece = moveToPosition(cardinal, piece);
 	if(piece.canCapturePiece){
-		newPiece = moveToPosition(cardinal, newPiece);
+		if(piece.cardinalCapture === cardinal){
+			newPiece = moveToPosition(cardinal, newPiece);
+		}
 	}
 	if(reference.board.isOutOfBounds(newPiece.row, newPiece.column)){
 		return;
@@ -867,9 +869,11 @@ function decisionMinMax(){
 	let movement;
 	let roundMovements = getAllMovements();
 	let utility = Number.NEGATIVE_INFINITY;
+	let number = 0;
 	for (let i = 0; i < roundMovements.length; i++){
 		let newGame = newModel(model);
-		let number = movePiece(roundMovements[i].piece.clone(), roundMovements[i].place, newGame);
+		number = 0;
+		number = movePiece(roundMovements[i].piece.clone(), roundMovements[i].place, newGame);
 		number += valueMin(newGame);
 
 		if(number >= utility) {
