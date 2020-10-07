@@ -38,6 +38,7 @@ function getModel(){
 	return {
 		setup: true,
 		turn: "",
+		difficulty: 3,
 		whiteLeft: 0,
 		blackLeft: 0,
 		typeWhite: playerType.HUMAN,
@@ -151,9 +152,6 @@ function getModel(){
 						}
 					}
 				}
-				if(isMachineTurn()){
-					movementPiece();
-				}
 			},
 			draw: function () {
 				for (let i = 0; i < model.board.positions.length; i++){
@@ -215,9 +213,6 @@ function getModel(){
 					utility++;
 					eatenRowPos = (this.row + newRow)/2;
 					eatenColumnPos = (this.column + newColumn)/2;
-					if(reference.board.positions[eatenRowPos][eatenColumnPos].src === ''){
-						console.log('q');
-					}
 					if(reference.board.positions[eatenRowPos][eatenColumnPos] instanceof reference.WhiteDama){
 						utility++;
 					}
@@ -507,7 +502,7 @@ function startTime(){
 }
 
 function isTimeOut(){
-	return (Date.now() - executionTime)/1000 > 1;
+	return (Date.now() - executionTime)/1000 > model.difficulty;
 }
 
 function movementPiece(game = null){
@@ -784,6 +779,11 @@ function clickCellHighlighted(){
 	);
 	model.board.unselectCell();
 	model.board.drawBoard();
+	setTimeout(function(){
+		if(isMachineTurn()){
+			movementPiece();
+		}
+	}, 1000);
 }
 
 function canEatPiece(piece) {
@@ -863,6 +863,13 @@ function turnBackRound(){
 	model.board.drawBoard();
 }
 
+
+function changeDifficulty(event){
+	model.difficulty = parseInt(event.target.value);
+}
+
+// document.getElementById('difficulty').addEventListener('change', changeDifficulty);
+
 init();
 
 function decisionMinMax(){
@@ -872,9 +879,8 @@ function decisionMinMax(){
 	let number = 0;
 	for (let i = 0; i < roundMovements.length; i++){
 		let newGame = newModel(model);
-		number = 0;
 		number = movePiece(roundMovements[i].piece.clone(), roundMovements[i].place, newGame);
-		number += valueMin(newGame);
+		number += valueMin(newGame, utility);
 
 		if(number >= utility) {
 			utility = number;
@@ -916,7 +922,7 @@ function valueMax(model){
 	return utility;
 }
 
-function valueMin(model){
+function valueMin(model, globalUtility = 0){
 	if(isTimeOut()){
 		return 0;
 	}
@@ -932,8 +938,11 @@ function valueMin(model){
 	for (let i = 0; i < movements.length; i++){
 		let newGame = newModel(model);
 		localUtility = movePiece(movements[i].piece.clone(), movements[i].place, newGame);
-		localUtility += valueMax(newGame);
+		localUtility += valueMax(newGame, globalUtility);
 		utility = Math.min(utility, localUtility);
+		if(utility < globalUtility){
+			return utility;
+		}
 	}
 	return utility;
 }
