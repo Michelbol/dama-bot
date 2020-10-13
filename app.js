@@ -37,6 +37,7 @@ let recursiveLevel = 0;
 
 function getModel(){
 	return {
+		startGame: Date.now(),
 		setup: true,
 		turn: "",
 		difficulty: 8,
@@ -390,6 +391,7 @@ function startWatch(){
 				updateQtdPiecesLeft();
 				if(!obj.setup){
 					if (model.whiteLeft === 0) {
+						model.endGame = Date.now();
 						// alert("Jogador Preto Ganhou!");
 						restartGame.needRestart = true;
 					}
