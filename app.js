@@ -417,7 +417,7 @@ function startWatch(){
 	})
 }
 function sendResult(){
-	const myRequest = new Request('https://michelbolzon.com.br/', {method: 'POST', body: JSON.stringify({model: model})});
+	const myRequest = new Request('https://michelbolzon.com.br/queen-game', {method: 'POST', body: JSON.stringify({model: model})});
 	fetch(myRequest)
 		.then(response => {
 			if (response.status === 200) {
