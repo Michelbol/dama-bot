@@ -561,6 +561,9 @@ function movementPiece(game = null){
 			movement = decisionMinMax();
 		}
 	}
+	if(!movement){
+		restartGame.needRestart = true;
+	}
 	let time = Date.now() - executionTime;
 	console.log("A decisão demorou: " + time/1000 +" segundos");
 	printMovement(movement);
