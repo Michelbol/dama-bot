@@ -33,17 +33,19 @@ const cardinalPointsAvailableBlack = {
 let restartGame = { needRestart: false };
 let model = getModel();
 let rounds = [];
+let recursiveLevel = 0;
 
 function getModel(){
 	return {
 		setup: true,
 		turn: "",
-		difficulty: 3,
+		difficulty: 8,
 		whiteLeft: 0,
 		blackLeft: 0,
-		typeWhite: playerType.HUMAN,
+		typeWhite: playerType.MACHINE,
 		typeBlack: playerType.MACHINE,
-		typeMachine: machineType.IA,
+		typeMachineBlack: machineType.RANDOM,
+		typeMachineWhite: machineType.IA,
 		board: {
 			rows: 0,
 			columns: 0,
@@ -94,7 +96,6 @@ function getModel(){
 				}
 			},
 			initBoard: function(rows, columns, piecesPerSide){
-				model.turn = turns.WHITE;
 
 				this.rows = rows;
 				this.columns = columns;
@@ -248,7 +249,6 @@ function getModel(){
 						return utility;
 					}
 				}
-				reference.turn = reference.turn === turns.WHITE ? turns.BLACK : turns.WHITE;
 				return utility;
 			};
 			this.draw = function () {
@@ -367,7 +367,9 @@ let init = function() {
 	startWatch();
 	model.board.initBoard(8, 8, 12);
 	model.board.drawBoard();
-	model.setup = false;
+	// model.setup = false;
+	// model.turn = turns.WHITE;
+	sendResult();
 };
 
 function startWatch(){
@@ -376,16 +378,23 @@ function startWatch(){
 			obj[prop] = newValue;
 			if (prop === "turn"){
 				changeTurnName();
+				if(!obj.setup) {
+					if (obj[`type${newValue}`] === playerType.MACHINE) {
+						setTimeout(function (){
+							movementPiece();
+						}, 200);
+					}
+				}
 			}
 			if ((prop === "whiteLeft") || prop === "blackLeft") {
 				updateQtdPiecesLeft();
 				if(!obj.setup){
 					if (model.whiteLeft === 0) {
-						alert("Jogador Preto Ganhou!");
+						// alert("Jogador Preto Ganhou!");
 						restartGame.needRestart = true;
 					}
 					if (model.blackLeft === 0) {
-						alert("Jogador Branco Ganhou!");
+						// alert("Jogador Branco Ganhou!");
 						restartGame.needRestart = true;
 					}
 				}
@@ -397,11 +406,32 @@ function startWatch(){
 		set: function(obj, prop, newValue){
 			if(prop === 'needRestart'){
 				if(newValue){
+					if(model.typeWhite === playerType.MACHINE){
+						sendResult();
+						debugger;
+					}
 					init();
 				}
 			}
 		}
 	})
+}
+function sendResult(){
+	const myRequest = new Request('https://michelbolzon.com.br/', {method: 'POST', body: JSON.stringify({model: model})});
+	fetch(myRequest)
+		.then(response => {
+			if (response.status === 200) {
+				return response.json();
+			} else {
+				throw new Error('Ops! Houve um erro em nosso servidor.');
+			}
+		})
+		.then(response => {
+			console.debug(response);
+			// ...
+		}).catch(error => {
+		console.error(error);
+	});
 }
 
 function updateQtdPiecesLeft(){
@@ -451,40 +481,29 @@ function getAllMovements(game = null){
 }
 
 function AllMovementsPlayerTurn(game = null){
+	let reference;
+	if(game === null){
+		reference = model;
+	}else{
+		reference = game;
+	}
 	let movements = [];
 	let pieceCapture = '';
 
-	model.board.positions.filter(function(row){
+	reference.board.positions.filter(function(row){
 		row.filter(function (piece){
-			if(game === null){
-				if(piece.color === model.turn && piece.src !== ''){
-					let movement;
-					if(model.turn === turns.BLACK){
-						movement = canMoveBlack(piece);
-					}else{
-						movement = canMoveWhite(piece);
-					}
-					if(movement.canMove){
-						if(piece.canCapturePiece){
-							if(pieceCapture !== ''){
-								cleanCaptureInformation(model.board.positions[pieceCapture.row][pieceCapture.column]);
-							}
-							pieceCapture = piece.clone();
-						}
-						movements.push({piece: piece.clone(), places: movement.places});
-					}
-				}
-				return false;
-			}
-			if(piece.color === game.turn && piece.src !== ''){
+			if(piece.color === reference.turn && piece.src !== ''){
 				let movement;
-				if(game.turn === turns.BLACK){
+				if(reference.turn === turns.BLACK){
 					movement = canMoveBlack(piece);
 				}else{
 					movement = canMoveWhite(piece);
 				}
 				if(movement.canMove){
 					if(piece.canCapturePiece){
+						if(pieceCapture !== ''){
+							cleanCaptureInformation(reference.board.positions[pieceCapture.row][pieceCapture.column]);
+						}
 						pieceCapture = piece.clone();
 					}
 					movements.push({piece: piece.clone(), places: movement.places});
@@ -505,28 +524,52 @@ function isTimeOut(){
 	return (Date.now() - executionTime)/1000 > model.difficulty;
 }
 
+/**
+ * @returns {boolean}
+ */
+function canGoDeeper(){
+	return (model.difficulty*100) > recursiveLevel;
+}
+
 function movementPiece(game = null){
 	let movement;
-	if(model.typeMachine === machineType.RANDOM){
-		let { movements, pieceCapture } = AllMovementsPlayerTurn();
-		if(pieceCapture){
-			movePiece(pieceCapture, pieceCapture.cardinalCapture)
-			return;
-		}
-		movement = chooseRandomMovement(movements);
+	let reference;
+	if(game === null){
+		reference = model;
 	}else{
-		startTime();
-		movement = decisionMinMax();
-		let time = Date.now() - executionTime;
-		console.log("A decisão demorou: " + time/1000 +" segundos");
+		reference = game;
 	}
+	startTime();
+	if(reference.turn === turns.BLACK){
+		if(reference.typeMachineBlack === machineType.RANDOM){
+			movement = movementRandom(reference);
+		}else{
+			movement = decisionMinMax();
+		}
+	}else{
+		if(reference.typeMachineWhite === machineType.RANDOM){
+			movement = movementRandom(reference);
+		}else{
+			movement = decisionMinMax();
+		}
+	}
+	let time = Date.now() - executionTime;
+	console.log("A decisão demorou: " + time/1000 +" segundos");
 	printMovement(movement);
-	movePiece(movement.piece, movement.place, game);
+	movePiece(movement.piece, movement.place);
 }
 
 function chooseRandomMovement(movements){
 	let piece = chooseRandomItemIntoArray(movements);
 	return {piece: piece.piece.clone(), place: chooseRandomItemIntoArray(piece.places)};
+}
+
+function movementRandom(game){
+	let { movements, pieceCapture } = AllMovementsPlayerTurn(game);
+	if(pieceCapture){
+		return {piece: pieceCapture.clone(), place: pieceCapture.cardinalCapture};
+	}
+	return chooseRandomMovement(movements);
 }
 
 function movePiece(piece, cardinal, game = null){
@@ -547,10 +590,11 @@ function movePiece(piece, cardinal, game = null){
 	}
 	let utility = piece.changePosition(newPiece.row, newPiece.column, game);
 	cleanCaptureInformation(piece);
-	if(game === null){
+	if(game === null) {
 		reference.board.unselectCell();
 		reference.board.drawBoard();
 	}
+	changeTurn(reference);
 	return utility;
 }
 
@@ -780,10 +824,12 @@ function clickCellHighlighted(){
 	model.board.unselectCell();
 	model.board.drawBoard();
 	setTimeout(function(){
-		if(isMachineTurn()){
-			movementPiece();
-		}
+		changeTurn(model);
 	}, 1000);
+}
+
+function changeTurn(game){
+	game.turn = game.turn === turns.WHITE ? turns.BLACK : turns.WHITE;
 }
 
 function canEatPiece(piece) {
@@ -874,14 +920,14 @@ init();
 
 function decisionMinMax(){
 	let movement;
+	recursiveLevel = 0;
 	let roundMovements = getAllMovements();
 	let utility = Number.NEGATIVE_INFINITY;
 	let number = 0;
 	for (let i = 0; i < roundMovements.length; i++){
 		let newGame = newModel(model);
 		number = movePiece(roundMovements[i].piece.clone(), roundMovements[i].place, newGame);
-		number += valueMin(newGame, utility);
-
+		number += valueMin(newGame, utility, 0);
 		if(number >= utility) {
 			utility = number;
 			movement = {piece: roundMovements[i].piece.clone(), place: roundMovements[i].place};
@@ -900,51 +946,50 @@ function newModel(game){
 	return newGame;
 }
 
-function valueMax(model){
-	if(isTimeOut()){
+function valueMax(model, globalUtility){
+	if(!canGoDeeper()){
 		return 0;
 	}
+	recursiveLevel = recursiveLevel+1;
 	if(isFinal(model)){
 		return calcUtility(model);
 	}
-	let utility = Number.NEGATIVE_INFINITY;
 	let movements = getAllMovements(model);
 	if(movements.length === 0){
 		return 1/2;
 	}
-	let localUtility = 0;
+	let values = [];
 	for (let i = 0; i < movements.length; i++){
 		let newGame = newModel(model);
-		localUtility += movePiece(movements[i].piece.clone(), movements[i].place, newGame);
-		localUtility += valueMin(newGame);
-		utility = Math.max(utility, localUtility);
+		let calc = movePiece(movements[i].piece.clone(), movements[i].place, newGame);
+		calc += valueMin(newGame, globalUtility);
+		values.push(calc);
 	}
-	return utility;
+	return Math.max(...values);
 }
 
 function valueMin(model, globalUtility = 0){
-	if(isTimeOut()){
+	if(!canGoDeeper()){
 		return 0;
 	}
+	recursiveLevel = recursiveLevel+1;
+
 	if(isFinal(model)){
 		return calcUtility(model);
 	}
-	let utility = Number.POSITIVE_INFINITY;
 	let movements = getAllMovements(model);
 	if(movements.length === 0){
 		return 1/2;
 	}
-	let localUtility = 0;
+	let values = [];
+
 	for (let i = 0; i < movements.length; i++){
 		let newGame = newModel(model);
-		localUtility = movePiece(movements[i].piece.clone(), movements[i].place, newGame);
-		localUtility += valueMax(newGame, globalUtility);
-		utility = Math.min(utility, localUtility);
-		if(utility < globalUtility){
-			return utility;
-		}
+		let calc = movePiece(movements[i].piece.clone(), movements[i].place, newGame)
+		calc += valueMax(newGame, globalUtility);
+		values.push(calc);
 	}
-	return utility;
+	return Math.min(...values);
 }
 
 function isFinal(model){
