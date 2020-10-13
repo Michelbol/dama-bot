@@ -434,7 +434,7 @@ function sendResult(){
 			'black_left': model.blackLeft,
 			'difficulty': model.difficulty,
 			'start_game': model.startGame,
-			'end_game': model.endGame,
+			'end_game': Date.now(),
 			'type_white': model.typeWhite,
 			'type_black': model.typeBlack,
 			'type_black_machine': model.typeMachineBlack,
