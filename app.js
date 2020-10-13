@@ -417,21 +417,23 @@ function startWatch(){
 	})
 }
 function sendResult(){
-	const myRequest = new Request('https://michelbolzon.com.br/queen-game', {method: 'POST', body: JSON.stringify({model: model})});
-	fetch(myRequest)
-		.then(response => {
-			if (response.status === 200) {
-				return response.json();
-			} else {
-				throw new Error('Ops! Houve um erro em nosso servidor.');
-			}
-		})
-		.then(response => {
-			console.debug(response);
-			// ...
-		}).catch(error => {
-		console.error(error);
-	});
+	let myHeaders = new Headers();
+	myHeaders.append("Accept", "application/json");
+	myHeaders.append("Content-Type", "application/json");
+
+	let raw = JSON.stringify({"model":model});
+
+	let requestOptions = {
+		method: 'POST',
+		headers: myHeaders,
+		body: raw,
+		redirect: 'follow'
+	};
+
+	fetch("https://michelbolzon.com.br/queen-game", requestOptions)
+		.then(response => response.text())
+		.then(result => console.log(result))
+		.catch(error => console.log('error', error));
 }
 
 function updateQtdPiecesLeft(){
