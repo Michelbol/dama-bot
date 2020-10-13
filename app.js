@@ -38,6 +38,7 @@ let recursiveLevel = 0;
 function getModel(){
 	return {
 		startGame: Date.now(),
+		endGame: null,
 		setup: true,
 		turn: "",
 		difficulty: 10,
@@ -426,7 +427,19 @@ function sendResult(){
 	myHeaders.append("Accept", "application/json");
 	myHeaders.append("Content-Type", "application/json");
 
-	let raw = JSON.stringify({"model":model});
+	let raw = JSON.stringify(
+		{
+			"model":model,
+			'white_left': model.whiteLeft,
+			'black_left': model.blackLeft,
+			'difficulty': model.difficulty,
+			'start_game': model.startGame,
+			'end_game': model.endGame,
+			'type_white': model.typeWhite,
+			'type_black': model.typeBlack,
+			'type_black_machine': model.typeMachineBlack,
+			'type_white_machine': model.typeMachineWhite,
+		});
 
 	let requestOptions = {
 		method: 'POST',
