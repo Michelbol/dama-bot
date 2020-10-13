@@ -364,14 +364,18 @@ function getModel(){
 }
 
 let init = function() {
+	alert('Estou executando Testes não será possível jogar, caso clique em Ok estarei salvando as informações da partida(Robo vs Robo)');
+	startGame();
+};
+
+function startGame(){
 	model = getModel();
 	startWatch();
 	model.board.initBoard(8, 8, 12);
 	model.board.drawBoard();
 	model.setup = false;
 	model.turn = turns.WHITE;
-	alert('Estou executando Testes não será possível jogar, caso clique em Ok estarei salvando as informações da partida(Robo vs Robo)');
-};
+}
 
 function startWatch(){
 	model = new Proxy(model, {
@@ -411,7 +415,7 @@ function startWatch(){
 					if(model.typeWhite === playerType.MACHINE){
 						sendResult();
 					}
-					init();
+					startGame();
 				}
 			}
 		}
