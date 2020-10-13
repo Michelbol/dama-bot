@@ -410,7 +410,6 @@ function startWatch(){
 				if(newValue){
 					if(model.typeWhite === playerType.MACHINE){
 						sendResult();
-						debugger;
 					}
 					init();
 				}
