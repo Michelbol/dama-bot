@@ -40,13 +40,13 @@ function getModel(){
 		startGame: Date.now(),
 		setup: true,
 		turn: "",
-		difficulty: 8,
+		difficulty: 10,
 		whiteLeft: 0,
 		blackLeft: 0,
 		typeWhite: playerType.MACHINE,
 		typeBlack: playerType.MACHINE,
-		typeMachineBlack: machineType.RANDOM,
-		typeMachineWhite: machineType.IA,
+		typeMachineBlack: machineType.IA,
+		typeMachineWhite: machineType.RANDOM,
 		board: {
 			rows: 0,
 			columns: 0,
@@ -539,6 +539,7 @@ function canGoDeeper(){
 }
 
 function movementPiece(game = null){
+	recursiveLevel = 0;
 	let movement;
 	let reference;
 	if(game === null){
