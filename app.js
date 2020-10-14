@@ -39,6 +39,7 @@ function getModel(){
 	return {
 		startGame: Date.now(),
 		endGame: null,
+		changeTurn: true,
 		setup: true,
 		turn: "",
 		difficulty: 10,
@@ -208,6 +209,7 @@ function getModel(){
 				}else{
 					reference = game;
 				}
+				reference.changeTurn = true;
 				reference.board.positions[this.row][this.column] = new reference.Piece(this.row, this.column);
 				let eatenRowPos;
 				let eatenColumnPos;
@@ -247,6 +249,7 @@ function getModel(){
 						if(!isMachineTurn()){
 							alert('Você pode comer mais peças');
 						}
+						reference.changeTurn = false;
 						utility++;
 						return utility;
 					}
@@ -387,7 +390,9 @@ function startWatch(){
 				if(!obj.setup) {
 					if (obj[`type${newValue}`] === playerType.MACHINE) {
 						setTimeout(function (){
-							movementPiece();
+							if(!movementPiece()){
+								changeTurn(model);
+							}
 						}, 200);
 					}
 				}
@@ -560,7 +565,7 @@ function movementPiece(game = null){
 	}else{
 		reference = game;
 	}
-	startTime();
+	// startTime();
 	if(reference.turn === turns.BLACK){
 		if(reference.typeMachineBlack === machineType.RANDOM){
 			movement = movementRandom(reference);
@@ -574,13 +579,16 @@ function movementPiece(game = null){
 			movement = decisionMinMax();
 		}
 	}
-	if(!movement){
+	if(!movement || movement.piece === null){
 		restartGame.needRestart = true;
+		return;
 	}
-	let time = Date.now() - executionTime;
-	console.log("A decisão demorou: " + time/1000 +" segundos");
+	// let time = Date.now() - executionTime;
+	// console.log("A decisão demorou: " + time/1000 +" segundos");
+	console.log(movement);
 	printMovement(movement);
 	movePiece(movement.piece, movement.place);
+	return reference.changeTurn;
 }
 
 function chooseRandomMovement(movements){
@@ -942,22 +950,47 @@ function changeDifficulty(event){
 
 init();
 
+let max;
+let min;
+
 function decisionMinMax(){
-	let movement;
 	recursiveLevel = 0;
 	let roundMovements = getAllMovements();
+	let stats = [];
 	let utility = Number.NEGATIVE_INFINITY;
 	let number = 0;
 	for (let i = 0; i < roundMovements.length; i++){
 		let newGame = newModel(model);
+		max = Number.NEGATIVE_INFINITY;
+		min = Number.POSITIVE_INFINITY;
 		number = movePiece(roundMovements[i].piece.clone(), roundMovements[i].place, newGame);
-		number += valueMin(newGame, utility, 0);
+		number += valueMin(newGame);
+		stats.push(
+			{
+				utility: number,
+				movement: {piece: roundMovements[i].piece.clone(), place: roundMovements[i].place},
+				recursiveLevel: recursiveLevel
+			}
+		);
 		if(number >= utility) {
 			utility = number;
-			movement = {piece: roundMovements[i].piece.clone(), place: roundMovements[i].place};
 		}
 	}
-	return movement;
+	return returnBestMovement(stats).movement;
+}
+
+function returnBestMovement(movementStats){
+	let bestMove = {
+		utility: 0,
+		movement: {piece: null, place: null},
+		recursiveLevel: model.difficulty*100
+	};
+	for (let i = 0; i < movementStats.length; i++){
+		if(bestMove.utility <= movementStats[i].utility){
+			bestMove = movementStats[i];
+		}
+	}
+	return bestMove;
 }
 
 function newModel(game){
@@ -970,7 +1003,7 @@ function newModel(game){
 	return newGame;
 }
 
-function valueMax(model, globalUtility){
+function valueMax(model){
 	if(!canGoDeeper()){
 		return 0;
 	}
@@ -982,17 +1015,21 @@ function valueMax(model, globalUtility){
 	if(movements.length === 0){
 		return 1/2;
 	}
-	let values = [];
+	let values = Number.NEGATIVE_INFINITY;
 	for (let i = 0; i < movements.length; i++){
 		let newGame = newModel(model);
 		let calc = movePiece(movements[i].piece.clone(), movements[i].place, newGame);
-		calc += valueMin(newGame, globalUtility);
-		values.push(calc);
+		calc += valueMin(newGame);
+		values = Math.max(values, calc);
+		// if(calc >= min){
+		// 	return calc;
+		// }
 	}
-	return Math.max(...values);
+	max = Math.max(max, values);
+	return values;
 }
 
-function valueMin(model, globalUtility = 0){
+function valueMin(model){
 	if(!canGoDeeper()){
 		return 0;
 	}
@@ -1005,15 +1042,18 @@ function valueMin(model, globalUtility = 0){
 	if(movements.length === 0){
 		return 1/2;
 	}
-	let values = [];
-
+	let values = Number.POSITIVE_INFINITY;
 	for (let i = 0; i < movements.length; i++){
 		let newGame = newModel(model);
 		let calc = movePiece(movements[i].piece.clone(), movements[i].place, newGame)
-		calc += valueMax(newGame, globalUtility);
-		values.push(calc);
+		calc += valueMax(newGame);
+		values = Math.min(calc, values);
+		// if(calc <= max){
+		// 	return calc;
+		// }
 	}
-	return Math.min(...values);
+	min = Math.min(values, min);
+	return values;
 }
 
 function isFinal(model){
