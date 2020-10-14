@@ -586,7 +586,7 @@ function movementPiece(game = null){
 	// let time = Date.now() - executionTime;
 	// console.log("A decisão demorou: " + time/1000 +" segundos");
 	console.log(movement);
-	printMovement(movement);
+	// printMovement(movement);
 	movePiece(movement.piece, movement.place);
 	return reference.changeTurn;
 }
@@ -600,6 +600,9 @@ function movementRandom(game){
 	let { movements, pieceCapture } = AllMovementsPlayerTurn(game);
 	if(pieceCapture){
 		return {piece: pieceCapture.clone(), place: pieceCapture.cardinalCapture};
+	}
+	if(movements.length === 0){
+		return {piece: null}
 	}
 	return chooseRandomMovement(movements);
 }
